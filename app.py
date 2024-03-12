@@ -18,13 +18,7 @@ db_name = secrets["db_name"]
 def fetch_categories_from_db():
     # Get the timestamp for 24 hours ago
     twenty_four_hours_ago = (datetime.now() - timedelta(hours=24)).timestamp() * 1000
-    conn = psycopg2.connect(
-        dbname=db_name,
-        user=db_user,
-        password=db_password,
-        host=db_host,
-        port=db_port
-    )
+    conn = psycopg2.connect(database=db_name, user=db_user, password=db_password, host=db_host, port=db_port)
     c = conn.cursor()
     c.execute(f"SELECT slug FROM articles WHERE summary != '' AND last_published_at > {twenty_four_hours_ago} ORDER BY last_published_at DESC")
     categories = {row[0].split('/')[0].upper() for row in c.fetchall()}  # Convert slugs to uppercase
@@ -33,27 +27,38 @@ def fetch_categories_from_db():
     categories_list.insert(0, 'All')  # Insert 'All' at the beginning
     return categories_list
 
+
+
+
+
 # Function to fetch data from PostgreSQL database based on selected categories
 def fetch_data_from_db(selected_categories):
-    conn = psycopg2.connect(
-        dbname=db_name,
-        user=db_user,
-        password=db_password,
-        host=db_host,
-        port=db_port
-    )
+    conn = psycopg2.connect(database=db_name, user=db_user, password=db_password, host=db_host, port=db_port)
     c = conn.cursor()
     # Get the timestamp for 24 hours ago
     twenty_four_hours_ago = (datetime.now() - timedelta(hours=24)).timestamp() * 1000
+    
+    # Construct the query based on selected categories
+# Construct the query based on selected categories
     if not selected_categories or 'All' in selected_categories:
-        query = f"SELECT headline, last_published_at, summary, url, hero_image_s3_key, slug FROM articles WHERE summary != '' AND last_published_at > {twenty_four_hours_ago} ORDER BY last_published_at DESC"
+        query = "SELECT headline, last_published_at, summary, url, hero_image_s3_key, slug FROM articles WHERE summary != '' AND last_published_at > %s ORDER BY last_published_at DESC"
+        c.execute(query, (twenty_four_hours_ago,))
+    elif len(selected_categories) == 1:  # Only one category selected
+        query = f"SELECT headline, last_published_at, summary, url, hero_image_s3_key, slug FROM articles WHERE slug LIKE %s AND summary != '' AND last_published_at > %s ORDER BY last_published_at DESC"
+        params = [f"{selected_categories[0].lower()}%", twenty_four_hours_ago]
+        c.execute(query, params)
     else:
-        selected_categories_condition = " OR ".join([f"slug LIKE '{category}%'" for category in selected_categories])
-        query = f"SELECT headline, last_published_at, summary, url, hero_image_s3_key, slug FROM articles WHERE ({selected_categories_condition}) AND summary != '' AND last_published_at > {twenty_four_hours_ago} ORDER BY last_published_at DESC"
-    c.execute(query)
+        placeholders = ','.join(['%s']*len(selected_categories))
+        selected_categories_condition = " OR ".join([f"slug LIKE %s" for _ in selected_categories])
+        query = f"SELECT headline, last_published_at, summary, url, hero_image_s3_key, slug FROM articles WHERE ({selected_categories_condition}) AND summary != '' AND last_published_at > %s ORDER BY last_published_at DESC"
+        params = [f"{category.lower()}%" for category in selected_categories] + [twenty_four_hours_ago]
+        c.execute(query, params)
+
+
     data = c.fetchall()
     conn.close()
     return data
+
 
 
 
@@ -94,7 +99,7 @@ selected_category = st.sidebar.radio('Select Category', categories, index=0)  # 
 if selected_category == 'All':
     articles_data = fetch_data_from_db([])
 else:
-    articles_data = fetch_data_from_db([selected_category])
+    articles_data = fetch_data_from_db([selected_category.upper()]) 
 
 # Display each news card
 for article in articles_data:
