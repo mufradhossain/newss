@@ -66,7 +66,7 @@ def fetch_data_from_db(selected_categories):
 # Function to append the base URL to the hero image S3 key
 def get_image_url(hero_image_s3_key):
     if hero_image_s3_key is not None:
-        base_url = "https://images.prothomalo.com/"
+        base_url = "https://media.prothomalo.com/"
         return base_url + hero_image_s3_key
     else:
         return None
@@ -109,7 +109,7 @@ for article in articles_data:
     if image_url is not None:
         col1, col2 = st.columns([1, 3]) 
         with col1:
-            st.image(image_url, use_column_width='always')
+            st.image(image_url, use_container_width='always')
         with col2:
             st.title(f"{headline}")
             published_datetime = timestamp_to_dhaka_datetime(last_published_at)
